@@ -8,7 +8,7 @@ Gem::Specification.new do |s|
 
   s.author            = 'Josh McArthur'
   s.email             = 'josh@3months.com'
-  s.homepage          = 'joshmcarthur.me'
+  s.homepage          = 'http://joshmcarthur.me'
 
   s.files        = Dir['CHANGELOG', 'README.md', 'LICENSE', 'lib/**/*', 'app/**/*']
   s.require_path = 'lib'

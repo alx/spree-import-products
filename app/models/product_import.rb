@@ -10,6 +10,7 @@ class ProductImport < ActiveRecord::Base
   
   require 'fastercsv'
   require 'pp'
+  require 'htmlentities'
   
   ## Data Importing:
   # Supplier, room and category are all taxonomies to be found (or created) and associated
@@ -24,46 +25,120 @@ class ProductImport < ActiveRecord::Base
       #Get products *before* import - 
       @products_before_import = Product.all
 
+      #Setup HTML decoder
+      coder = HTMLEntities.new
+
       columns = ImportProductSettings::COLUMN_MAPPINGS
       rows = FasterCSV.read(self.data_file.path)
       log("Importing products for #{self.data_file_file_name} began at #{Time.now}")
+      nameless_product_count = 0
+
       rows[ImportProductSettings::INITIAL_ROWS_TO_SKIP..-1].each do |row|
-        product_information = {}
         
-        #Easy ones first
-        product_information[:sku] = row[columns['SKU']]
-        product_information[:name] = row[columns['Name']]
-        product_information[:price] = row[columns['Master Price']]
-        product_information[:cost_price] = row[columns['Cost Price']]
-        product_information[:available_on] = DateTime.now - 1.day #Yesterday to make SURE it shows up
-        product_information[:weight] = row[columns['Weight']]
-        product_information[:height] = row[columns['Height']]
-        product_information[:depth] = row[columns['Depth']]
-        product_information[:width] = row[columns['Width']]
-        product_information[:description] = columns['Description']
+        if product_obj = Product.find(:first, :include => [:product_properties, :properties], :conditions => ['properties.name LIKE ? && product_properties.value LIKE ?', "XmlImportId", row[columns['Id']]])
+          v = Variant.create :product => product_obj, :sku => row[columns['SKU']], :price => row[columns['Master Price']]
         
+          brand_type = OptionType.find_or_create :name => "Brand", :presentation => "Marque"
+          v.options_values << OptionValue.find_or_create_by_name_and_presentation_and_option_type_id(row[columns['Brand']], row[columns['v']], brand_type.id)
+        
+          color_type = OptionType.find_or_create :name => "Color", :presentation => "Couleur"
+          v.options_values << OptionValue.find_or_create_by_name_and_presentation_and_option_type_id(row[columns['Color']], row[columns['Color']], color_type.id)
+        
+          size_type = OptionType.find_or_create :name => "Size", :presentation => "Taille"
+          v.options_values << OptionValue.find_or_create_by_name_and_presentation_and_option_type_id(row[columns['Size']], row[columns['Size']], size_type.id)
+        
+          age_type = OptionType.find_or_create :name => "Age", :presentation => "Age"
+          v.options_values << OptionValue.find_or_create_by_name_and_presentation_and_option_type_id(row[columns['Age']], row[columns['Age']], age_type.id)
+          
+          v.save!
+          product_obj.save!
+          log("Variant saved for #{v.sku}")
+        else
+          #Create the product skeleton - should be valid
+          product_obj = Product.new()
+        
+          #Easy ones first
+          if row[columns['Name']].blank?
+            log("Product with no name: #{row[columns['Description']]}")
+            product_obj.name = "No-name product #{nameless_product_count}"
+            nameless_product_count += 1
+          else
+            #Decode HTML for names and/or descriptions if necessary
+            if ImportProductSettings::HTML_DECODE_NAMES
+              product_obj.name = coder.decode(row[columns['Name']])
+            else
+              product_obj.name = row[columns['Name']]
+            end
+          end
+          #product_obj.sku = row[columns['SKU']] || product_obj.name.gsub(' ', '_')
+          product_obj.price = row[columns['Master Price']] || 0.0
+          #product_obj.cost_price = row[columns['Cost Price']]
+          product_obj.available_on = DateTime.now - 1.day #Yesterday to make SURE it shows up
+          product_obj.weight = columns['Weight'] ? row[columns['Weight']] : 0.0
+          product_obj.height = columns['Height'] ? row[columns['Height']] : 0.0
+          product_obj.depth = columns['Depth'] ? row[columns['Depth']] : 0.0
+          product_obj.width = columns['Width'] ? row[columns['Width']] : 0.0
+          #Decode HTML for descriptions if needed
+          if ImportProductSettings::HTML_DECODE_DESCRIPTIONS
+            product_obj.description = coder.decode(row[columns['Description']])
+          else
+            product_obj.description = row[columns['Description']]
+          end
+        
+        
+          #Assign a default shipping category
+          product_obj.shipping_category = ShippingCategory.find_or_create_by_name(ImportProductSettings::DEFAULT_SHIPPING_CATEGORY)
+          product_obj.tax_category = TaxCategory.find_or_create_by_name(ImportProductSettings::DEFAULT_TAX_CATEGORY)
 
-        #Create the product skeleton - should be valid
-        product_obj = Product.new(product_information)
-        unless product_obj.valid?
-          log("A product could not be imported - here is the information we have:\n #{ pp product_information}", :error)
-          next
-        end
+          unless product_obj.valid?
+            log("A product could not be imported - here is the information we have:\n #{ pp product_obj.attributes}", :error)
+            next
+          end
         
-        #Save the object before creating asssociated objects
-        product_obj.save
-
-        #Now we have all but images and taxons loaded
-        associate_taxon('Category', row[columns['Category']], product_obj)
+          #Save the object before creating asssociated objects
+          product_obj.save!
         
-        #Just images 
-        find_and_attach_image(row[columns['Image Main']], product_obj)
-        find_and_attach_image(row[columns['Image 2']], product_obj)
-        find_and_attach_image(row[columns['Image 3']], product_obj)
-        find_and_attach_image(row[columns['Image 4']], product_obj)
+          xml_import_id_prop = Property.find_or_create_by_name_and_presentation("XmlImportId", "XmlImportId")
+          ProductProperty.create :property => xml_import_id_prop, :product => product_obj, :value => row[columns['Id']]
+        
+          unless product_obj.master
+            log("[ERROR] No variant set for: #{product_obj.name}")
+          end
 
-        #Return a success message
-        log("#{product_obj.name} successfully imported.\n")
+          #Now we have all but images and taxons loaded
+          associate_taxon('Category', row[columns['Category']], product_obj)
+          associate_taxon('Gender', row[columns['Gender']], product_obj)
+
+          #Just images 
+          #find_and_attach_image(row[columns['Image Main']], product_obj)
+          #find_and_attach_image(row[columns['Image 2']], product_obj)
+          #find_and_attach_image(row[columns['Image 3']], product_obj)
+          #find_and_attach_image(row[columns['Image 4']], product_obj)
+
+          #Save master variant, for some reason saving product with price set above
+          #doesn't create the master variant
+          log("Master Variant saved for #{product_obj.sku}") if product_obj.master.save!
+        
+          v = Variant.create :product => product_obj, :sku => row[columns['SKU']], :price => row[columns['Master Price']]
+        
+          brand_type = OptionType.find_or_create :name => "Brand", :presentation => "Marque"
+          v.options_values << OptionValue.find_or_create_by_name_and_presentation_and_option_type_id(row[columns['Brand']], row[columns['v']], brand_type.id)
+        
+          color_type = OptionType.find_or_create :name => "Color", :presentation => "Couleur"
+          v.options_values << OptionValue.find_or_create_by_name_and_presentation_and_option_type_id(row[columns['Color']], row[columns['Color']], color_type.id)
+        
+          size_type = OptionType.find_or_create :name => "Size", :presentation => "Taille"
+          v.options_values << OptionValue.find_or_create_by_name_and_presentation_and_option_type_id(row[columns['Size']], row[columns['Size']], size_type.id)
+        
+          age_type = OptionType.find_or_create :name => "Age", :presentation => "Age"
+          v.options_values << OptionValue.find_or_create_by_name_and_presentation_and_option_type_id(row[columns['Age']], row[columns['Age']], age_type.id)
+          
+              v.save!
+          product_obj.save!
+          log("Variant saved for #{v.sku}") 
+
+          #Return a success message
+          log("[#{product_obj.sku}] #{product_obj.name}($#{product_obj.master.price}) successfully imported.\n") if product_obj.save
       end
       
       if ImportProductSettings::DESTROY_ORIGINAL_PRODUCTS_AFTER_IMPORT
@@ -108,6 +183,7 @@ class ProductImport < ActiveRecord::Base
     #Does the file exist? Can we read it?
     return if filename.blank?
     filename = ImportProductSettings::PRODUCT_IMAGE_PATH + filename
+    log("filename::::: #{filename}")
     unless File.exists?(filename) && File.readable?(filename)
       log("Image #{filename} was not found on the server, so this image was not imported.", :warn)
       return nil
@@ -128,18 +204,29 @@ class ProductImport < ActiveRecord::Base
   def associate_taxon(taxonomy_name, taxon_name, product)
     master_taxon = Taxonomy.find_by_name(taxonomy_name)
     
-    if master_taxon.nil?
-      master_taxon = Taxonomy.create(:name => taxonomy_name)
-      log("Could not find Category taxonomy, so it was created.", :warn)
+    #Find all existing taxons and assign them to the product
+    existing_taxons = Taxon.find_all_by_name(taxon_name)
+    if existing_taxons and !existing_taxons.empty?
+      existing_taxons.each do |taxon|
+        product.taxons << taxon
+      end
+    else
+      #Create any taxons that don't exist
+      master_taxon = Taxonomy.find_by_name(taxonomy_name)
+      if master_taxon.nil?
+        master_taxon = Taxonomy.create(:name => taxonomy_name)
+        log("Could not find Category taxonomy, so it was created.", :warn)
+      end
+
+      taxon = Taxon.find_or_create_by_name_and_parent_id_and_taxonomy_id(
+        taxon_name,
+        master_taxon.root.id,
+        master_taxon.id
+      )
+
+      product.taxons << taxon if taxon.save
     end
-    
-    taxon = Taxon.find_or_create_by_name_and_parent_id_and_taxonomy_id(
-      taxon_name, 
-      master_taxon.root.id, 
-      master_taxon.id
-    )
-    
-    product.taxons << taxon if taxon.save
+
   end
 
   
