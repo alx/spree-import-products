@@ -212,7 +212,7 @@ class ProductImport < ActiveRecord::Base
   ### VARIANT HELPERS ###  
   def create_variant(product_obj, row, columns)
     v = Variant.create :product => product_obj, :sku => row[columns['SKU']], :price => row[columns['Master Price']]
-    log("Import - option types: #{OptionType.all.inspect}")
+    
     [
       ["Brand", "Marque"],
       ["Color", "Couleur"],
@@ -229,7 +229,7 @@ class ProductImport < ActiveRecord::Base
         if option_value = OptionValue.first(:conditions => ["name LIKE ? AND presentation LIKE ? AND option_type_id = ?", name, presentation, option_type.id])
           OptionValue.create! :name => value, :presentation => value, :option_type => option_type
         end
-        v.options_values << option_value
+        v.option_values << option_value
       end
       
     end
