@@ -227,7 +227,7 @@ class ProductImport < ActiveRecord::Base
           option_type = OptionType.create! :name => name, :presentation => presentation
         end
         if option_value = OptionValue.first(:conditions => ["name LIKE ? AND presentation LIKE ? AND option_type_id = ?", name, presentation, option_type.id])
-          OptionValue.create! :name => value, :presentation => value, :option_type => option_type
+          option_value = OptionValue.create! :name => value, :presentation => value, :option_type => option_type
         end
         v.option_values << option_value
       end
