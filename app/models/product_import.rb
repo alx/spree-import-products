@@ -29,11 +29,15 @@ class ProductImport < ActiveRecord::Base
       coder = HTMLEntities.new
 
       columns = ImportProductSettings::COLUMN_MAPPINGS
+      log("Import - Columns setting: #{columns.inspect}")
+      
       rows = FasterCSV.read(self.data_file.path)
       log("Importing products for #{self.data_file_file_name} began at #{Time.now}")
       nameless_product_count = 0
-
+      
       rows[ImportProductSettings::INITIAL_ROWS_TO_SKIP..-1].each do |row|
+        
+        log("Import - Current row: #{row.inspect}")
         
         if product_obj = Product.find(:first, :include => [:product_properties, :properties], :conditions => ['properties.name LIKE ? && product_properties.value LIKE ?', "XmlImportId", row[columns['Id']]])
           
@@ -206,7 +210,7 @@ class ProductImport < ActiveRecord::Base
   ### END TAXON HELPERS ###
   
   ### VARIANT HELPERS ###  
-  def create_variant(product, row, columns)
+  def create_variant(product_obj, row, columns)
     v = Variant.create :product => product_obj, :sku => row[columns['SKU']], :price => row[columns['Master Price']]
     
     [
@@ -215,8 +219,10 @@ class ProductImport < ActiveRecord::Base
       ["Size", "Taille"],
       ["Age", "Age"],
     ]. each do |name, presentation|
-    
-      if option_value = row[columns[name]] && !option_value.empty?
+      
+      log("Import - Variant option: #{name} - value: #{row[columns[name]]}")
+      
+      if option_value = row[columns[name]]
         option_type = OptionType.find_or_create :name => name, :presentation => presentation
         v.options_values << OptionValue.find_or_create_by_name_and_presentation_and_option_type_id(name, presentation, option_type.id)
       end
@@ -224,6 +230,6 @@ class ProductImport < ActiveRecord::Base
     end
     
     v.save!
-    product.save!
+    product_obj.save!
   end
 end
