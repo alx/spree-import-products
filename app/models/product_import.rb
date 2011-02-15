@@ -36,23 +36,10 @@ class ProductImport < ActiveRecord::Base
       rows[ImportProductSettings::INITIAL_ROWS_TO_SKIP..-1].each do |row|
         
         if product_obj = Product.find(:first, :include => [:product_properties, :properties], :conditions => ['properties.name LIKE ? && product_properties.value LIKE ?', "XmlImportId", row[columns['Id']]])
-          v = Variant.create :product => product_obj, :sku => row[columns['SKU']], :price => row[columns['Master Price']]
-        
-          brand_type = OptionType.find_or_create :name => "Brand", :presentation => "Marque"
-          v.options_values << OptionValue.find_or_create_by_name_and_presentation_and_option_type_id(row[columns['Brand']], row[columns['v']], brand_type.id)
-        
-          color_type = OptionType.find_or_create :name => "Color", :presentation => "Couleur"
-          v.options_values << OptionValue.find_or_create_by_name_and_presentation_and_option_type_id(row[columns['Color']], row[columns['Color']], color_type.id)
-        
-          size_type = OptionType.find_or_create :name => "Size", :presentation => "Taille"
-          v.options_values << OptionValue.find_or_create_by_name_and_presentation_and_option_type_id(row[columns['Size']], row[columns['Size']], size_type.id)
-        
-          age_type = OptionType.find_or_create :name => "Age", :presentation => "Age"
-          v.options_values << OptionValue.find_or_create_by_name_and_presentation_and_option_type_id(row[columns['Age']], row[columns['Age']], age_type.id)
           
-          v.save!
-          product_obj.save!
+          create_variant(product_obj, row, columns)
           log("Variant saved for #{v.sku}")
+          
         else
           #Create the product skeleton - should be valid
           product_obj = Product.new()
@@ -118,33 +105,21 @@ class ProductImport < ActiveRecord::Base
           #Save master variant, for some reason saving product with price set above
           #doesn't create the master variant
           log("Master Variant saved for #{product_obj.sku}") if product_obj.master.save!
-        
-          v = Variant.create :product => product_obj, :sku => row[columns['SKU']], :price => row[columns['Master Price']]
-        
-          brand_type = OptionType.find_or_create :name => "Brand", :presentation => "Marque"
-          v.options_values << OptionValue.find_or_create_by_name_and_presentation_and_option_type_id(row[columns['Brand']], row[columns['v']], brand_type.id)
-        
-          color_type = OptionType.find_or_create :name => "Color", :presentation => "Couleur"
-          v.options_values << OptionValue.find_or_create_by_name_and_presentation_and_option_type_id(row[columns['Color']], row[columns['Color']], color_type.id)
-        
-          size_type = OptionType.find_or_create :name => "Size", :presentation => "Taille"
-          v.options_values << OptionValue.find_or_create_by_name_and_presentation_and_option_type_id(row[columns['Size']], row[columns['Size']], size_type.id)
-        
-          age_type = OptionType.find_or_create :name => "Age", :presentation => "Age"
-          v.options_values << OptionValue.find_or_create_by_name_and_presentation_and_option_type_id(row[columns['Age']], row[columns['Age']], age_type.id)
           
-              v.save!
-          product_obj.save!
+          create_variant(product_obj, row, columns)
+          
           log("Variant saved for #{v.sku}") 
 
           #Return a success message
           log("[#{product_obj.sku}] #{product_obj.name}($#{product_obj.master.price}) successfully imported.\n") if product_obj.save
+        end
+        
       end
       
       if ImportProductSettings::DESTROY_ORIGINAL_PRODUCTS_AFTER_IMPORT
         @products_before_import.each { |p| p.destroy }
       end
-      
+    
       log("Importing products for #{self.data_file_file_name} completed at #{DateTime.now}")
       
     rescue Exception => exp
@@ -228,7 +203,27 @@ class ProductImport < ActiveRecord::Base
     end
 
   end
-
-  
   ### END TAXON HELPERS ###
+  
+  ### VARIANT HELPERS ###  
+  def create_variant(product, row, columns)
+    v = Variant.create :product => product_obj, :sku => row[columns['SKU']], :price => row[columns['Master Price']]
+    
+    [
+      ["Brand", "Marque"],
+      ["Color", "Couleur"],
+      ["Size", "Taille"],
+      ["Age", "Age"],
+    ]. each do |name, presentation|
+    
+      if option_value = row[columns[name]] && !option_value.empty?
+        option_type = OptionType.find_or_create :name => name, :presentation => presentation
+        v.options_values << OptionValue.find_or_create_by_name_and_presentation_and_option_type_id(name, presentation, option_type.id)
+      end
+      
+    end
+    
+    v.save!
+    product.save!
+  end
 end
