@@ -97,12 +97,6 @@ class ProductImport < ActiveRecord::Base
           associate_taxon('Category', row[columns['Category']], product_obj)
           associate_taxon('Gender', row[columns['Gender']], product_obj)
 
-          #Just images 
-          #find_and_attach_image(row[columns['Image Main']], product_obj)
-          #find_and_attach_image(row[columns['Image 2']], product_obj)
-          #find_and_attach_image(row[columns['Image 3']], product_obj)
-          #find_and_attach_image(row[columns['Image 4']], product_obj)
-
           #Save master variant, for some reason saving product with price set above
           #doesn't create the master variant
           log("Master Variant saved for #{product_obj.sku}") if product_obj.master.save!
@@ -206,30 +200,40 @@ class ProductImport < ActiveRecord::Base
   
   ### VARIANT HELPERS ###  
   def create_variant(product_obj, row, columns)
-    v = Variant.create :product => product_obj, :sku => row[columns['SKU']], :price => row[columns['Master Price']]
     
-    [
-      ["Brand", "Marque"],
-      ["Color", "Couleur"],
-      ["Size", "Taille"],
-      ["Age", "Age"],
-    ]. each do |name, presentation|
-      
-      log("Import - Variant option: #{name} - value: #{row[columns[name]]}")
-      
-      if value = row[columns[name]]
-        unless option_type = OptionType.first(:conditions => ["name LIKE ? AND presentation LIKE ?", name, presentation])
-          option_type = OptionType.create! :name => name, :presentation => presentation
+    if variant = Variant.first(:conditions => ["product_id = ? AND sku = ? AND price = ?", product_obj.id, row[columns['SKU']], row[columns['Master Price']]])
+      find_and_attach_image(row[columns['Image Main']], variant) if row[columns['Image Main']]
+      find_and_attach_image(row[columns['Image 2']], variant) if row[columns['Image 2']]
+      find_and_attach_image(row[columns['Image 3']], variant) if row[columns['Image 3']]
+    else
+      variant = Variant.create :product => product_obj, :sku => row[columns['SKU']], :price => row[columns['Master Price']]
+
+      [
+        ["Brand", "Marque"],
+        ["Color", "Couleur"],
+        ["Size", "Taille"],
+        ["Age", "Age"],
+      ]. each do |name, presentation|
+
+        log("Import - Variant option: #{name} - value: #{row[columns[name]]}")
+
+        if value = row[columns[name]]
+          unless option_type = OptionType.first(:conditions => ["name LIKE ? AND presentation LIKE ?", name, presentation])
+            option_type = OptionType.create! :name => name, :presentation => presentation
+          end
+          unless option_value = OptionValue.first(:conditions => ["name LIKE ? AND presentation LIKE ? AND option_type_id = ?", value, value, option_type.id])
+            option_value = OptionValue.create! :name => value, :presentation => value, :option_type => option_type
+          end
+          variant.option_values << option_value
         end
-        unless option_value = OptionValue.first(:conditions => ["name LIKE ? AND presentation LIKE ? AND option_type_id = ?", value, value, option_type.id])
-          option_value = OptionValue.create! :name => value, :presentation => value, :option_type => option_type
-        end
-        v.option_values << option_value
       end
       
+      find_and_attach_image(row[columns['Image Main']], variant) if row[columns['Image Main']]
+      find_and_attach_image(row[columns['Image 2']], variant) if row[columns['Image 2']]
+      find_and_attach_image(row[columns['Image 3']], variant) if row[columns['Image 3']]
     end
     
-    v.save!
+    variant.save!
     product_obj.save!
     
     log("Variant saved for #{v.sku}")
