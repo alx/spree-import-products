@@ -111,8 +111,6 @@ class ProductImport < ActiveRecord::Base
           log("Master Variant saved for #{product_obj.sku}") if product_obj.master.save!
           
           create_variant(product_obj, row, columns)
-          
-          log("Variant saved for #{v.sku}") 
 
           #Return a success message
           log("[#{product_obj.sku}] #{product_obj.name}($#{product_obj.master.price}) successfully imported.\n") if product_obj.save
@@ -226,7 +224,7 @@ class ProductImport < ActiveRecord::Base
         unless option_type = OptionType.first(:conditions => ["name LIKE ? AND presentation LIKE ?", name, presentation])
           option_type = OptionType.create! :name => name, :presentation => presentation
         end
-        if option_value = OptionValue.first(:conditions => ["name LIKE ? AND presentation LIKE ? AND option_type_id = ?", name, presentation, option_type.id])
+        unless option_value = OptionValue.first(:conditions => ["name LIKE ? AND presentation LIKE ? AND option_type_id = ?", value, value, option_type.id])
           option_value = OptionValue.create! :name => value, :presentation => value, :option_type => option_type
         end
         v.option_values << option_value
@@ -236,5 +234,7 @@ class ProductImport < ActiveRecord::Base
     
     v.save!
     product_obj.save!
+    
+    log("Variant saved for #{v.sku}")
   end
 end
