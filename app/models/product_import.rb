@@ -202,6 +202,7 @@ class ProductImport < ActiveRecord::Base
   def create_variant(product_obj, row, columns)
     
     if variant = Variant.first(:conditions => ["product_id = ? AND sku = ? AND price = ?", product_obj.id, row[columns['SKU']], row[columns['Master Price']]])
+      log("Variant found: #{variant.sku}")
       find_and_attach_image(row[columns['Image Main']], variant) if row[columns['Image Main']]
       find_and_attach_image(row[columns['Image 2']], variant) if row[columns['Image 2']]
       find_and_attach_image(row[columns['Image 3']], variant) if row[columns['Image 3']]
@@ -236,6 +237,6 @@ class ProductImport < ActiveRecord::Base
     variant.save!
     product_obj.save!
     
-    log("Variant saved for #{v.sku}")
+    log("Variant saved for #{variant.sku}")
   end
 end
