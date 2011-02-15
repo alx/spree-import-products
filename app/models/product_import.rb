@@ -40,10 +40,7 @@ class ProductImport < ActiveRecord::Base
         log("Import - Current row: #{row.inspect}")
         
         if product_obj = Product.find(:first, :include => [:product_properties, :properties], :conditions => ['properties.name LIKE ? && product_properties.value LIKE ?', "XmlImportId", row[columns['Id']]])
-          
           create_variant(product_obj, row, columns)
-          log("Variant saved for #{v.sku}")
-          
         else
           #Create the product skeleton - should be valid
           product_obj = Product.new()
