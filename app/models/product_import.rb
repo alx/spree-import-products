@@ -88,20 +88,27 @@ class ProductImport < ActiveRecord::Base
         
           xml_import_id_prop = Property.find_or_create_by_name_and_presentation("XmlImportId", "XmlImportId")
           ProductProperty.create :property => xml_import_id_prop, :product => product_obj, :value => row[columns['Id']]
-        
+          
+          brand_prop = Property.find_or_create_by_name_and_presentation("Brand", "Marque")
+          ProductProperty.create :property => brand_prop, :product => product_obj, :value => row[columns['Brand']]
+          
           unless product_obj.master
             log("[ERROR] No variant set for: #{product_obj.name}")
           end
-
+          
           #Now we have all but images and taxons loaded
           associate_taxon('Category', row[columns['Category']], product_obj)
           associate_taxon('Gender', row[columns['Gender']], product_obj)
-
+          
           #Save master variant, for some reason saving product with price set above
           #doesn't create the master variant
           log("Master Variant saved for #{product_obj.sku}") if product_obj.master.save!
           
           create_variant(product_obj, row, columns)
+          
+          find_and_attach_image(row[columns['Image Main']], product_obj) if row[columns['Image Main']]
+          find_and_attach_image(row[columns['Image 2']], product_obj) if row[columns['Image 2']]
+          find_and_attach_image(row[columns['Image 3']], product_obj) if row[columns['Image 3']]
 
           #Return a success message
           log("[#{product_obj.sku}] #{product_obj.name}($#{product_obj.master.price}) successfully imported.\n") if product_obj.save
@@ -203,14 +210,10 @@ class ProductImport < ActiveRecord::Base
     
     if variant = Variant.first(:conditions => ["product_id = ? AND sku = ? AND price = ?", product_obj.id, row[columns['SKU']], row[columns['Master Price']]])
       log("Variant found: #{variant.sku}")
-      find_and_attach_image(row[columns['Image Main']], variant) if row[columns['Image Main']]
-      find_and_attach_image(row[columns['Image 2']], variant) if row[columns['Image 2']]
-      find_and_attach_image(row[columns['Image 3']], variant) if row[columns['Image 3']]
     else
       variant = Variant.create :product => product_obj, :sku => row[columns['SKU']], :price => row[columns['Master Price']]
 
       [
-        ["Brand", "Marque"],
         ["Color", "Couleur"],
         ["Size", "Taille"],
         ["Age", "Age"],
