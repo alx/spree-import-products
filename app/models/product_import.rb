@@ -231,10 +231,6 @@ class ProductImport < ActiveRecord::Base
           variant.option_values << option_value
         end
       end
-      
-      find_and_attach_image(row[columns['Image Main']], variant) if row[columns['Image Main']]
-      find_and_attach_image(row[columns['Image 2']], variant) if row[columns['Image 2']]
-      find_and_attach_image(row[columns['Image 3']], variant) if row[columns['Image 3']]
     end
     
     variant.save!
