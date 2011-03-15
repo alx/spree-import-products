@@ -6,21 +6,43 @@ class ImportProductSettings
     #The first column is 0, etc etc.
     #This is accessed in the import method using COLUMN_MAPPINGS['field'] for niceness and readability
     #TODO this could probably be marked up in YML
+
+    # Original columns
+    # COLUMN_MAPPINGS = {
+    #   'SKU' => 0,
+    #   'Name' => 1,
+    #   'Master Price' => 2,
+    #   'Cost Price' => 3,
+    #   'Weight' => 4,
+    #   'Height' => 5,
+    #   'Width' => 6,
+    #   'Depth' => 7,
+    #   'Image Main' => 8,
+    #   'Image 2' => 9,
+    #   'Image 3' => 10,
+    #   'Image 4' => 11,
+    #   'Description' => 12,
+    #   'Category' => 13
+    # }
+    
+    # Globalener csv columns
     COLUMN_MAPPINGS = {
-      'SKU' => 0,
-      'Name' => 1,
-      'Master Price' => 2,
-      'Cost Price' => 3,
-      'Weight' => 4,
-      'Height' => 5,
-      'Width' => 6,
-      'Depth' => 7,
-      'Image Main' => 8,
-      'Image 2' => 9,
-      'Image 3' => 10,
-      'Image 4' => 11,
-      'Description' => 12,
-      'Category' => 13
+      'libelle' => 0,
+      'rien1' => 1,
+      'description_prod' => 2,
+      'rien2' => 3,
+      'prixprodht' => 4,
+      'idclassif' => 5,
+      'classif' => 6,
+      'idarticle' => 7,
+      'rien3' => 8,
+      'idfournisseur' => 9,
+      'fournisseur' => 10,
+      'reffournisseur' => 11,
+      'codebarre' => 12,
+      'idmarque' => 13,
+      'idmarqueremise' => 14,
+      'refremplacement' => 15
     }
 
     #Where are you keeping your master images?
