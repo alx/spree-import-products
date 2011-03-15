@@ -37,83 +37,62 @@ class ProductImport < ActiveRecord::Base
       
       rows[ImportProductSettings::INITIAL_ROWS_TO_SKIP..-1].each do |row|
         
-        log("Import - Current row: #{row.inspect}")
+        log("Import - Current row: #{row[columns['libelle']]}")
         
-        if product_obj = Product.find(:first, :include => [:product_properties, :properties], :conditions => ['properties.name LIKE ? && product_properties.value LIKE ?', "XmlImportId", row[columns['Id']]])
-          create_variant(product_obj, row, columns)
+        #Create the product skeleton - should be valid
+        product_obj = Product.new()
+      
+
+        #Decode HTML for names and/or descriptions if necessary
+        if ImportProductSettings::HTML_DECODE_NAMES
+          product_obj.name = coder.decode(row[columns['libelle']])
         else
-          #Create the product skeleton - should be valid
-          product_obj = Product.new()
-        
-          #Easy ones first
-          if row[columns['Name']].blank?
-            log("Product with no name: #{row[columns['Description']]}")
-            product_obj.name = "No-name product #{nameless_product_count}"
-            nameless_product_count += 1
-          else
-            #Decode HTML for names and/or descriptions if necessary
-            if ImportProductSettings::HTML_DECODE_NAMES
-              product_obj.name = coder.decode(row[columns['Name']])
-            else
-              product_obj.name = row[columns['Name']]
-            end
-          end
-          #product_obj.sku = row[columns['SKU']] || product_obj.name.gsub(' ', '_')
-          product_obj.price = row[columns['Master Price']] || 0.0
-          #product_obj.cost_price = row[columns['Cost Price']]
-          product_obj.available_on = DateTime.now - 1.day #Yesterday to make SURE it shows up
-          product_obj.weight = columns['Weight'] ? row[columns['Weight']] : 0.0
-          product_obj.height = columns['Height'] ? row[columns['Height']] : 0.0
-          product_obj.depth = columns['Depth'] ? row[columns['Depth']] : 0.0
-          product_obj.width = columns['Width'] ? row[columns['Width']] : 0.0
-          #Decode HTML for descriptions if needed
-          if ImportProductSettings::HTML_DECODE_DESCRIPTIONS
-            product_obj.description = coder.decode(row[columns['Description']])
-          else
-            product_obj.description = row[columns['Description']]
-          end
-        
-        
-          #Assign a default shipping category
-          product_obj.shipping_category = ShippingCategory.find_or_create_by_name(ImportProductSettings::DEFAULT_SHIPPING_CATEGORY)
-          product_obj.tax_category = TaxCategory.find_or_create_by_name(ImportProductSettings::DEFAULT_TAX_CATEGORY)
-
-          unless product_obj.valid?
-            log("A product could not be imported - here is the information we have:\n #{ pp product_obj.attributes}", :error)
-            next
-          end
-        
-          #Save the object before creating asssociated objects
-          product_obj.save!
-        
-          xml_import_id_prop = Property.find_or_create_by_name_and_presentation("XmlImportId", "XmlImportId")
-          ProductProperty.create :property => xml_import_id_prop, :product => product_obj, :value => row[columns['Id']]
-          
-          brand_prop = Property.find_or_create_by_name_and_presentation("Brand", "Marque")
-          ProductProperty.create :property => brand_prop, :product => product_obj, :value => row[columns['Brand']]
-          
-          unless product_obj.master
-            log("[ERROR] No variant set for: #{product_obj.name}")
-          end
-          
-          #Now we have all but images and taxons loaded
-          associate_taxon('Category', row[columns['Category']], product_obj)
-          associate_taxon('Gender', row[columns['Gender']], product_obj)
-          
-          #Save master variant, for some reason saving product with price set above
-          #doesn't create the master variant
-          log("Master Variant saved for #{product_obj.sku}") if product_obj.master.save!
-          
-          create_variant(product_obj, row, columns)
-          
-          find_and_attach_image(row[columns['Image Main']], product_obj) if row[columns['Image Main']]
-          find_and_attach_image(row[columns['Image 2']], product_obj) if row[columns['Image 2']]
-          find_and_attach_image(row[columns['Image 3']], product_obj) if row[columns['Image 3']]
-
-          #Return a success message
-          log("[#{product_obj.sku}] #{product_obj.name}($#{product_obj.master.price}) successfully imported.\n") if product_obj.save
+          product_obj.name = row[columns['libelle']]
         end
         
+        product_obj.sku = row[columns['codebarre']] || product_obj.name.gsub(' ', '_')
+        product_obj.price = row[columns['prixprodht']] || 0.0
+        
+        if ImportProductSettings::HTML_DECODE_DESCRIPTIONS
+          product_obj.description = coder.decode(row[columns['description_prod']])
+        else
+          product_obj.description = row[columns['description_prod']]
+        end
+        
+        #Assign a default shipping category
+        product_obj.shipping_category = ShippingCategory.find_or_create_by_name(ImportProductSettings::DEFAULT_SHIPPING_CATEGORY)
+        product_obj.tax_category = TaxCategory.find_or_create_by_name(ImportProductSettings::DEFAULT_TAX_CATEGORY)
+
+        unless product_obj.valid?
+          log("A product could not be imported - here is the information we have:\n #{ pp product_obj.attributes}", :error)
+          next
+        end
+      
+        #Save the object before creating asssociated objects
+        product_obj.save!
+      
+        idclassif_prop = Property.find_or_create_by_name_and_presentation("idclassif", "idclassif")
+        ProductProperty.create :property => idclassif_prop, :product => product_obj, :value => row[columns['idclassif']]
+        
+        brand_prop = Property.find_or_create_by_name_and_presentation("Brand", "Marque")
+        ProductProperty.create :property => brand_prop, :product => product_obj, :value => row[columns['Brand']]
+        
+        #Now we have all but images and taxons loaded
+        associate_taxon('idclassif', row[columns['idclassif']], product_obj)
+        associate_taxon('classif', row[columns['classif']], product_obj)
+        associate_taxon('idfournisseur', row[columns['idfournisseur']], product_obj)
+        associate_taxon('fournisseur', row[columns['fournisseur']], product_obj)
+        associate_taxon('reffournisseur', row[columns['reffournisseur']], product_obj)
+        
+        #Save master variant, for some reason saving product with price set above
+        #doesn't create the master variant
+        log("Master Variant saved for #{product_obj.sku}") if product_obj.master.save!
+        
+        find_and_attach_image(File.join(current_repo, , "#{row[columns['idfournisseur']]}/#{row[columns['reffournisseur']]}.jpg"), product_obj)
+
+        #Return a success message
+        log("[#{product_obj.sku}] #{product_obj.name}($#{product_obj.master.price}) successfully imported.\n") if product_obj.save
+
       end
       
       if ImportProductSettings::DESTROY_ORIGINAL_PRODUCTS_AFTER_IMPORT
@@ -204,38 +183,4 @@ class ProductImport < ActiveRecord::Base
 
   end
   ### END TAXON HELPERS ###
-  
-  ### VARIANT HELPERS ###  
-  def create_variant(product_obj, row, columns)
-    
-    if variant = Variant.first(:conditions => ["product_id = ? AND sku = ? AND price = ?", product_obj.id, row[columns['SKU']], row[columns['Master Price']]])
-      log("Variant found: #{variant.sku}")
-    else
-      variant = Variant.create :product => product_obj, :sku => row[columns['SKU']], :price => row[columns['Master Price']]
-
-      [
-        ["Color", "Couleur"],
-        ["Size", "Taille"],
-        ["Age", "Age"],
-      ]. each do |name, presentation|
-
-        log("Import - Variant option: #{name} - value: #{row[columns[name]]}")
-
-        if value = row[columns[name]]
-          unless option_type = OptionType.first(:conditions => ["name LIKE ? AND presentation LIKE ?", name, presentation])
-            option_type = OptionType.create! :name => name, :presentation => presentation
-          end
-          unless option_value = OptionValue.first(:conditions => ["name LIKE ? AND presentation LIKE ? AND option_type_id = ?", value, value, option_type.id])
-            option_value = OptionValue.create! :name => value, :presentation => value, :option_type => option_type
-          end
-          variant.option_values << option_value
-        end
-      end
-    end
-    
-    variant.save!
-    product_obj.save!
-    
-    log("Variant saved for #{variant.sku}")
-  end
 end
