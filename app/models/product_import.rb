@@ -42,22 +42,10 @@ class ProductImport < ActiveRecord::Base
         #Create the product skeleton - should be valid
         product_obj = Product.new()
       
-
-        #Decode HTML for names and/or descriptions if necessary
-        if ImportProductSettings::HTML_DECODE_NAMES
-          product_obj.name = coder.decode(row[columns['libelle']])
-        else
-          product_obj.name = row[columns['libelle']]
-        end
-        
+        product_obj.name = row[columns['libelle']]
         product_obj.sku = row[columns['codebarre']] || product_obj.name.gsub(' ', '_')
         product_obj.price = row[columns['prixprodht']] || 0.0
-        
-        if ImportProductSettings::HTML_DECODE_DESCRIPTIONS
-          product_obj.description = coder.decode(row[columns['description_prod']])
-        else
-          product_obj.description = row[columns['description_prod']]
-        end
+        product_obj.description = row[columns['description_prod']]
         
         #Assign a default shipping category
         product_obj.shipping_category = ShippingCategory.find_or_create_by_name(ImportProductSettings::DEFAULT_SHIPPING_CATEGORY)
@@ -88,7 +76,9 @@ class ProductImport < ActiveRecord::Base
         #doesn't create the master variant
         log("Master Variant saved for #{product_obj.sku}") if product_obj.master.save!
         
-        find_and_attach_image(File.join(current_repo, , "#{row[columns['idfournisseur']]}/#{row[columns['reffournisseur']]}.jpg"), product_obj)
+        current_repo = "/home/alx/dev/globalener_ftp/images"
+        image_file = File.join(current_repo, row[columns['idfournisseur']], "#{row[columns['reffournisseur']]}.jpg")
+        find_and_attach_image(image_file, product_obj)
 
         #Return a success message
         log("[#{product_obj.sku}] #{product_obj.name}($#{product_obj.master.price}) successfully imported.\n") if product_obj.save
