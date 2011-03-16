@@ -65,12 +65,13 @@ class ProductImport < ActiveRecord::Base
         brand_prop = Property.find_or_create_by_name_and_presentation("idmarque", "idmarque")
         ProductProperty.create :property => brand_prop, :product => product_obj, :value => row[columns['idmarque']]
         
-        fournisseur_prop = Property.find_or_create_by_name_and_presentation("fournisseur", "fournisseur")
-        ProductProperty.create :property => fournisseur_prop, :product => product_obj, :value => row[columns['fournisseur']]
+        fournisseur_prop = Property.find_or_create_by_name_and_presentation("idfournisseur", "idfournisseur")
+        ProductProperty.create :property => fournisseur_prop, :product => product_obj, :value => row[columns['idfournisseur']]
         
         #Now we have all but images and taxons loaded
         associate_taxon('classif', row[columns['classif']], product_obj)
         associate_taxon('idarticle', row[columns['idarticle']], product_obj)
+        associate_taxon('fournisseur', row[columns['fournisseur']], product_obj)
         associate_taxon('reffournisseur', row[columns['reffournisseur']], product_obj)
         associate_taxon('idmarqueremise', row[columns['idmarqueremise']], product_obj)
         associate_taxon('refremplacement', row[columns['refremplacement']], product_obj)
@@ -80,7 +81,8 @@ class ProductImport < ActiveRecord::Base
         log("Master Variant saved for #{product_obj.sku}") if product_obj.master.save!
         
         current_repo = "/home/alx/dev/globalener_ftp/images"
-        image_file = File.join(current_repo, row[columns['fournisseur']], "#{row[columns['reffournisseur']]}.jpg")
+        p row.inspect
+        image_file = File.join(current_repo, row[columns['idfournisseur']], "#{row[columns['reffournisseur']]}.jpg")
         find_and_attach_image(image_file, product_obj)
 
         #Return a success message
