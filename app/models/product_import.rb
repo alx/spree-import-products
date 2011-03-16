@@ -31,7 +31,7 @@ class ProductImport < ActiveRecord::Base
       columns = ImportProductSettings::COLUMN_MAPPINGS
       log("Import - Columns setting: #{columns.inspect}")
       
-      rows = FasterCSV.read(self.data_file.path)
+      rows = FasterCSV.read(self.data_file.path, {:col_sep => '|'})
       log("Importing products for #{self.data_file_file_name} began at #{Time.now}")
       nameless_product_count = 0
       
