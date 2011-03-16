@@ -73,7 +73,6 @@ class ProductImport < ActiveRecord::Base
         associate_taxon('idarticle', row[columns['idarticle']], product_obj)
         associate_taxon('fournisseur', row[columns['fournisseur']], product_obj)
         associate_taxon('reffournisseur', row[columns['reffournisseur']], product_obj)
-        associate_taxon('marque', row[columns['marque']], product_obj)
         associate_taxon('idmarqueremise', row[columns['idmarqueremise']], product_obj)
         associate_taxon('refremplacement', row[columns['refremplacement']], product_obj)
         
