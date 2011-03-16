@@ -62,15 +62,20 @@ class ProductImport < ActiveRecord::Base
         idclassif_prop = Property.find_or_create_by_name_and_presentation("idclassif", "idclassif")
         ProductProperty.create :property => idclassif_prop, :product => product_obj, :value => row[columns['idclassif']]
         
-        brand_prop = Property.find_or_create_by_name_and_presentation("Brand", "Marque")
-        ProductProperty.create :property => brand_prop, :product => product_obj, :value => row[columns['Brand']]
+        brand_prop = Property.find_or_create_by_name_and_presentation("idmarque", "idmarque")
+        ProductProperty.create :property => brand_prop, :product => product_obj, :value => row[columns['idmarque']]
+        
+        fournisseur_prop = Property.find_or_create_by_name_and_presentation("idfournisseur", "idfournisseur")
+        ProductProperty.create :property => fournisseur_prop, :product => product_obj, :value => row[columns['idfournisseur']]
         
         #Now we have all but images and taxons loaded
-        associate_taxon('idclassif', row[columns['idclassif']], product_obj)
         associate_taxon('classif', row[columns['classif']], product_obj)
-        associate_taxon('idfournisseur', row[columns['idfournisseur']], product_obj)
+        associate_taxon('idarticle', row[columns['idarticle']], product_obj)
         associate_taxon('fournisseur', row[columns['fournisseur']], product_obj)
         associate_taxon('reffournisseur', row[columns['reffournisseur']], product_obj)
+        associate_taxon('marque', row[columns['marque']], product_obj)
+        associate_taxon('idmarqueremise', row[columns['idmarqueremise']], product_obj)
+        associate_taxon('refremplacement', row[columns['refremplacement']], product_obj)
         
         #Save master variant, for some reason saving product with price set above
         #doesn't create the master variant
