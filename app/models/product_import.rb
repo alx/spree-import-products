@@ -80,9 +80,7 @@ class ProductImport < ActiveRecord::Base
         #doesn't create the master variant
         log("Master Variant saved for #{product_obj.sku}") if product_obj.master.save!
         
-        current_repo = "/home/alx/dev/globalener_ftp/images"
-        p row.inspect
-        image_file = File.join(current_repo, row[columns['idfournisseur']], "#{row[columns['reffournisseur']]}.jpg")
+        image_file = File.join(row[columns['idfournisseur']], "#{row[columns['reffournisseur']]}.jpg")
         find_and_attach_image(image_file, product_obj)
 
         #Return a success message
